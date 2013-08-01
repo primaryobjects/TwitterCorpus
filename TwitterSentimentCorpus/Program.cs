@@ -154,8 +154,8 @@ namespace TwitterSentimentCorpus
         /// <returns>List of CorpusDataRow (with Tweet DTO populated).</returns>
         private static List<CorpusDataRow> LoadTweets(TwitterService service, List<CorpusDataRow> corpus, string outputPath)
         {
+            List<CorpusDataRow> outputCorpus = new List<CorpusDataRow>();
             int skipCount = 0;
-            int saveCount = 0;
 
             for (int index = GetResumeIndex(corpus, outputPath); index < corpus.Count; index++)
             {
@@ -172,11 +172,11 @@ namespace TwitterSentimentCorpus
                     // Save the result to file.
                     SaveResult(row, outputPath);
 
-                    saveCount++;
+                    outputCorpus.Add(row);
 
                     if ((index + 1) % 50 == 0)
                     {
-                        Console.WriteLine("Saved " + (index + 1) + " tweets.");
+                        Console.WriteLine("Processed " + (index + 1) + " tweets.");
                     }
                 }
                 else
@@ -202,9 +202,9 @@ namespace TwitterSentimentCorpus
                 }
             }
 
-            Console.WriteLine("Saved " + saveCount + ", Skipped " + skipCount + ".");
+            Console.WriteLine("Saved " + outputCorpus.Count + ", Skipped " + skipCount + ".");
 
-            return corpus;
+            return outputCorpus;
         }
 
         #endregion
@@ -227,7 +227,7 @@ namespace TwitterSentimentCorpus
             TwitterService service = LoginTwitter();
            
             // Get tweets.
-            corpus = LoadTweets(service, corpus, _outputPath);
+            var outputCorpus = LoadTweets(service, corpus, _outputPath);
 
             Console.WriteLine("Completed at " + DateTime.Now + ".");
             Console.ReadKey();
