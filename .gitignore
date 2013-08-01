@@ -1,0 +1,13 @@
+*.cache
+*.pdb
+*.dll
+*.txt
+*.suo
+*.exe
+*.exe.config
+*.exe.manifest
+!README.txt
+*.xml
+packages/*
+*/obj/Debug/*
+!lib/*.dll
