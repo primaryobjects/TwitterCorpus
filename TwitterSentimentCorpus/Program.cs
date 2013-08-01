@@ -163,6 +163,10 @@ namespace TwitterSentimentCorpus
 
                 // Fetch the tweet.
                 var status = service.GetTweet(new GetTweetOptions() { Id = row.Id });
+                status.Text = status.Text.Replace(",", " ");
+                status.Text = status.Text.Replace("\n", " ");
+                status.Text = status.Text.Replace("\r", " ");
+                status.Text = status.Text.Replace("\t", " ");
 
                 if (service.Response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
