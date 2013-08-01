@@ -111,6 +111,41 @@ namespace TwitterSentimentCorpus
         }
 
         /// <summary>
+        /// Finds the index in the corpus to resume loading twitter data from. This allows resuming the load of tweets from an existing tweets.csv output file.
+        /// </summary>
+        /// <param name="corpus">List of CorpusDataRow</param>
+        /// <param name="outputPath">Output path</param>
+        /// <returns>int</returns>
+        private static int GetResumeIndex(List<CorpusDataRow> corpus, string outputPath)
+        {
+            int index = 0;
+
+            if (File.Exists(outputPath))
+            {
+                using (FileStream f = new FileStream(outputPath, FileMode.Open))
+                {
+                    using (StreamReader streamReader = new StreamReader(f))
+                    {
+                        using (CsvReader csvReader = new CsvReader(streamReader))
+                        {
+                            csvReader.Configuration.HasHeaderRecord = false;
+
+                            var output = csvReader.GetRecords<CorpusDataRow>();
+                            var last = output.LastOrDefault();
+                            if (last != null)
+                            {
+                                index = corpus.FindIndex(c => c.Id == last.Id) + 1;
+                                Console.WriteLine("Resume index " + index + ".");
+                            }
+                        }
+                    }
+                }
+            }
+
+            return index;
+        }
+
+        /// <summary>
         /// Loads the tweet text data for each id in the corpus.
         /// </summary>
         /// <param name="service">TwitterService</param>
@@ -119,13 +154,15 @@ namespace TwitterSentimentCorpus
         /// <returns>List of CorpusDataRow (with Tweet DTO populated).</returns>
         private static List<CorpusDataRow> LoadTweets(TwitterService service, List<CorpusDataRow> corpus, string outputPath)
         {
-            int count = 0;
+            int skipCount = 0;
+            int saveCount = 0;
 
-            foreach (var row in corpus)
+            for (int index = GetResumeIndex(corpus, outputPath); index < corpus.Count; index++)
             {
+                CorpusDataRow row = corpus[index];
+
                 // Fetch the tweet.
                 var status = service.GetTweet(new GetTweetOptions() { Id = row.Id });
-                count++;
 
                 if (service.Response.StatusCode == System.Net.HttpStatusCode.OK)
                 {
@@ -135,9 +172,11 @@ namespace TwitterSentimentCorpus
                     // Save the result to file.
                     SaveResult(row, outputPath);
 
-                    if (count % 50 == 0)
+                    saveCount++;
+
+                    if ((index + 1) % 50 == 0)
                     {
-                        Console.WriteLine("Saved " + count + " tweets.");
+                        Console.WriteLine("Saved " + (index + 1) + " tweets.");
                     }
                 }
                 else
@@ -146,11 +185,24 @@ namespace TwitterSentimentCorpus
                     TwitterRateLimitStatus rateSearch = service.Response.RateLimitStatus;
                     if (rateSearch.RemainingHits < 1)
                     {
-                        Console.WriteLine("Rate Limit reached. Sleeping until " + rateSearch.ResetTime.ToString());
-                        Thread.Sleep(rateSearch.ResetTime - DateTime.Now);
+                        DateTime resetTime = rateSearch.ResetTime + TimeSpan.FromMinutes(1);
+
+                        Console.WriteLine("Rate Limit reached. Sleeping until " + resetTime);
+                        Thread.Sleep(resetTime - DateTime.Now);
+
+                        // Try this record again.
+                        index--;
+                    }
+                    else
+                    {
+                        // Some other error. Maybe 404. Skip this record.
+                        skipCount++;
+                        Console.WriteLine("Skipped " + skipCount + " records. Got " + service.Response.StatusCode + ".");
                     }
                 }
             }
+
+            Console.WriteLine("Saved " + saveCount + ", Skipped " + skipCount + ".");
 
             return corpus;
         }
@@ -176,6 +228,9 @@ namespace TwitterSentimentCorpus
            
             // Get tweets.
             corpus = LoadTweets(service, corpus, _outputPath);
+
+            Console.WriteLine("Completed at " + DateTime.Now + ".");
+            Console.ReadKey();
         }
     }
 }
