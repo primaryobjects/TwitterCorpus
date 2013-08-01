@@ -36,6 +36,8 @@ namespace TwitterSentimentCorpus
                 {
                     using (CsvReader csvReader = new CsvReader(streamReader))
                     {
+                        csvReader.Configuration.HasHeaderRecord = false;
+
                         while (csvReader.Read())
                         {
                             CorpusDataRow row = new CorpusDataRow();
@@ -133,7 +135,7 @@ namespace TwitterSentimentCorpus
                     // Save the result to file.
                     SaveResult(row, outputPath);
 
-                    if (count % 100 == 0)
+                    if (count % 50 == 0)
                     {
                         Console.WriteLine("Saved " + count + " tweets.");
                     }
