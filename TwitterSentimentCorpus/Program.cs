@@ -211,6 +211,89 @@ namespace TwitterSentimentCorpus
             return outputCorpus;
         }
 
+        private static List<CorpusDataRow> SearchTweets(string keyword, Sentiment sentiment, int count, TwitterService service, string outputPath)
+        {
+            List<CorpusDataRow> outputCorpus = new List<CorpusDataRow>();
+            long? lastId = null;
+            int index = 0;
+            int skipCount = 0;
+
+            keyword += sentiment == Sentiment.Positive ? " :)" : " :(";
+
+            while (skipCount == 0 && outputCorpus.Count < count)
+            {
+                // Fetch the tweet.
+                var statusList = service.Search(new SearchOptions() { Q = keyword, Lang = "en", IncludeEntities = false, Count = count, MaxId = lastId });
+                lastId = statusList.Statuses.Last().Id;
+                foreach (var status in statusList.Statuses)
+                {
+                    if (!status.Text.StartsWith("RT") && !status.Text.Contains(":P") &&
+                        !((status.Text.Contains(":)") || status.Text.Contains(":-)") || status.Text.Contains(": )") || status.Text.Contains(":D") || status.Text.Contains("=)")) && 
+                        (status.Text.Contains(":(") || status.Text.Contains(":-(") || status.Text.Contains(": ("))) &&
+                        outputCorpus.Where(c => c.Tweet.Text == status.Text).Count() == 0)
+                    {
+                        status.Text = status.Text.Replace(",", " ");
+                        status.Text = status.Text.Replace("\n", " ");
+                        status.Text = status.Text.Replace("\r", " ");
+                        status.Text = status.Text.Replace("\t", " ");
+                        status.Text = status.Text.Replace(":)", " ");
+                        status.Text = status.Text.Replace(":-)", " ");
+                        status.Text = status.Text.Replace(": )", " ");
+                        status.Text = status.Text.Replace(":D", " ");
+                        status.Text = status.Text.Replace("=)", " ");
+                        status.Text = status.Text.Replace(":(", " ");
+                        status.Text = status.Text.Replace(":-(", " ");
+                        status.Text = status.Text.Replace(": (", " ");
+
+                        if (service.Response.StatusCode == System.Net.HttpStatusCode.OK)
+                        {
+                            // Convert the TwitterStatus to a Tweet DTO.
+                            CorpusDataRow row = new CorpusDataRow();
+                            row.Id = status.Id;
+                            row.Keyword = keyword;
+                            row.Tweet = Mapper.Map<TwitterStatus, Tweet>(status);
+                            row.Sentiment = sentiment;
+
+                            // Save the result to file.
+                            SaveResult(row, outputPath);
+
+                            outputCorpus.Add(row);
+
+                            if ((index + 1) % 50 == 0)
+                            {
+                                Console.WriteLine("Processed " + (index + 1) + " tweets.");
+                            }
+                        }
+                        else
+                        {
+                            // Check the rate limit.
+                            TwitterRateLimitStatus rateSearch = service.Response.RateLimitStatus;
+                            if (rateSearch.RemainingHits < 1)
+                            {
+                                DateTime resetTime = rateSearch.ResetTime + TimeSpan.FromMinutes(1);
+
+                                Console.WriteLine("Rate Limit reached. Sleeping until " + resetTime);
+                                Thread.Sleep(resetTime - DateTime.Now);
+
+                                // Try this record again.
+                                index--;
+                            }
+                            else
+                            {
+                                // Some other error. Maybe 404. Skip this record.
+                                skipCount++;
+                                Console.WriteLine("Skipped " + skipCount + " records. Got " + service.Response.StatusCode + ".");
+                            }
+                        }
+                    }
+                }
+            }
+
+            Console.WriteLine("Saved " + outputCorpus.Count + ", Skipped " + skipCount + ".");
+
+            return outputCorpus;
+        }
+
         #endregion
 
         static void Main(string[] args)

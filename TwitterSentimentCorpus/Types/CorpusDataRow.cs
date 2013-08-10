@@ -11,7 +11,7 @@ namespace TwitterSentimentCorpus.Types
         public long Id { get; set; }
         public string Keyword { get; set; }
         public Tweet Tweet { get; set; }
-        public Sentiment Sentiment { private get; set; }
+        public Sentiment Sentiment { get; set; }
         public int SentimentValue { get { return (int)Sentiment; } }
     }
 }
